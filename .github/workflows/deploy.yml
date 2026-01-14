@@ -1,0 +1,58 @@
+name: Deploy SharePoint Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Validate SSH Secrets
+      - name: Validate SSH Secrets
+        run: |
+          echo "SERVER_IP set? -> ${{ secrets.SERVER_IP != '' }}"
+          echo "SERVER_USER set? -> ${{ secrets.SERVER_USER != '' }}"
+          echo "SERVER_SSH_KEY set? -> ${{ secrets.SERVER_SSH_KEY != '' }}"
+
+      # 2. Deploy SharePoint Pipeline
+      - name: Deploy SharePoint on Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+
+            echo "==== Navigate to SharePoint repo ===="
+            cd /root/sharepoint_pipeline
+
+            echo "==== Allow git operations ===="
+            git config --global --add safe.directory /root/sharepoint_pipeline
+
+            echo "==== Pull latest code ===="
+            git reset --hard
+            git clean -fd
+            git fetch origin
+            git checkout main
+            git pull origin main
+
+            echo "==== Check and create Python virtualenv if missing ===="
+            if [ ! -d "venv" ]; then
+                echo "Virtualenv not found. Creating..."
+                python3 -m venv venv
+            fi
+            source venv/bin/activate
+
+            echo "==== Install / upgrade dependencies ===="
+            pip install --upgrade pip
+            pip install -r requirements.txt
+
+            echo "==== Run SharePoint ingestion ===="
+            python transformation.py
+
+            echo "==== SharePoint deployment completed successfully ===="

@@ -1,0 +1,11 @@
+logs/extraction
+logs/ingestion
+/config.py
+.env
+metastore_db
+downloads/
+*.pyc
+__pycache__/
+*.log
+*.zip
+
