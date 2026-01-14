@@ -11,16 +11,16 @@ from datetime import datetime
 from s3uploader.upload_to_s3 import upload_excel_to_cos
 import time
 load_dotenv()
+from config import get_config
 
-
-TENANT_ID = os.getenv("TENENT_ID")
-CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
-HOSTNAME = os.getenv("HOSTNAME")
-SITE_PATH = os.getenv("SITE_PATH")
-FOLDER_PATH = os.getenv("FOLDER_PATH")
+TENANT_ID = get_config("TENENT_ID",required=True)
+CLIENT_ID = get_config("CLIENT_ID",required=True)
+CLIENT_SECRET = get_config("CLIENT_SECRET",required=True)
+USERNAME = get_config("USERNAME",required=True)
+PASSWORD = get_config("PASSWORD",required=True)
+HOSTNAME = get_config("HOSTNAME",required=True)
+SITE_PATH = get_config("SITE_PATH",required=True)
+FOLDER_PATH = get_config("FOLDER_PATH",required=True)
 EXCEL_EXTENSION = ".xlsx"
 
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
