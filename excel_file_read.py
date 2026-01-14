@@ -13,6 +13,7 @@ import time
 load_dotenv()
 from config import get_config
 
+
 TENANT_ID = get_config("TENENT_ID",required=True)
 CLIENT_ID = get_config("CLIENT_ID",required=True)
 CLIENT_SECRET = get_config("CLIENT_SECRET",required=True)
