@@ -14,12 +14,12 @@ def upload_excel_to_cos(file_bytes: bytes, file_name: str):
     cos, bucket_name = connect_to_cos()
     outer_logs_dir, logs_dir, logger = setup_logging_for_url(file_name)
     utc_now = datetime.now(timezone.utc)
-    date_path = utc_now.strftime("%Y/%m/%d")
-    timestamp = utc_now.strftime("%Y%m%dT%H%M%S")
+    # date_path = utc_now.strftime("%Y/%m/%d")
+    timestamp = datetime.now().isoformat()
     fileName = file_name.replace('.xlsx','')
     object_key = (
         f"Sharepoint/{fileName}/"
-        f"{date_path}/{file_name}"
+        f"{file_name}"
     )
 
     transfer_config = TransferConfig(

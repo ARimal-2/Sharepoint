@@ -1,9 +1,7 @@
 import os
 import ibm_boto3
 from ibm_botocore.client import Config
-from dotenv import load_dotenv
 from config import get_config
-load_dotenv()
 
 def connect_to_cos():
     api_key = get_config("API_KEY", required=True)

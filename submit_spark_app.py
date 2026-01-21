@@ -38,15 +38,15 @@ def submit_job(token):
     
     payload = {
         "application_details": {
-            "application": f"s3a://{BUCKET_NAME}/main.py",
+            "application": f"s3a://{BUCKET_NAME}/Sharepoint_dep/main.py",
             "spark_version": "3.4",
             "conf": {
                 # Basic configs
                 "spark.app.name": "sharepoint",
-                "spark.submit.pyFiles": f"s3a://{BUCKET_NAME}/dependencies.zip",
+                "spark.submit.pyFiles": f"s3a://{BUCKET_NAME}/Sharepoint_dep/dependencies.zip",
                  "spark.jars.packages": "com.crealytics:spark-excel_2.12:0.13.7",
-                "spark.driver.memory": "4G",
-                "spark.executor.memory": "4G",
+                "spark.driver.memory": "8G",
+                "spark.executor.memory": "8G",
                 "ae.spark.executor.count": "1",
                 "spark.hadoop.fs.s3a.path.style.access": "true",
 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
@@ -87,7 +87,7 @@ def submit_job(token):
 
                 # S3/COS - main bucket
                 "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-
+                "spark.sql.debug.maxToStringFields":"1000",
                 f"spark.hadoop.fs.s3a.bucket.{BUCKET_NAME}.endpoint": COS_ENDPOINT,
                 f"spark.hadoop.fs.s3a.bucket.{BUCKET_NAME}.access.key": COS_ACCESS_KEY,
                 f"spark.hadoop.fs.s3a.bucket.{BUCKET_NAME}.secret.key": COS_SECRET_KEY,

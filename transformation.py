@@ -1,15 +1,16 @@
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
-
+from sharepoint_transformation.vert_san_plan import vert_san_plan_transform_and_load
 def transform_and_load(spark: SparkSession):
-    bucket_name = "sample-testing-data"
-    cos_key = "Sharepoint/FY26 Master Planning File/2026/01/14/FY26 Master Planning File.xlsx"
-    excel_path = f"s3a://{bucket_name}/{cos_key}"
+    df,full_table_name,excel_path = vert_san_plan_transform_and_load(spark)
+    # bucket_name = "sample-testing-data"
+    # cos_key = "Sharepoint/FY26 Master Planning File/2026/01/14/FY26 Master Planning File.xlsx"
+    # excel_path = f"s3a://{bucket_name}/{cos_key}"
 
-    catalog_name = "csi_catalog"
-    db_name = "sharepoint_csi_silver"
-    table_name = "vert_san_plan"
-    full_table_name = f"{catalog_name}.{db_name}.{table_name}"
+    # catalog_name = "csi_catalog"
+    # db_name = "sharepoint_csi_silver"
+    # table_name = "vert_san_plan"
+    # full_table_name = f"{catalog_name}.{db_name}.{table_name}"
 
 
     df = (
