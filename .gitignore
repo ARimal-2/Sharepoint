@@ -9,3 +9,6 @@ __pycache__/
 *.log
 *.zip
 compare_excel.py
+compare_teo_decimal.py
+forecasts_transformation.py
+

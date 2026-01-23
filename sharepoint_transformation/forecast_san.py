@@ -1,19 +1,18 @@
 from pyspark.sql import SparkSession
 from config import get_config
 
-def vert_ster_plan_transform_and_load(spark: SparkSession):
+def vert_fore_san_transform_and_load(spark: SparkSession):
     bucket_name = get_config("BUCKET_NAME", required=True)
     cos_key = get_config("cos_key", required=True)
     excel_path = f"s3a://{bucket_name}/{cos_key}"
 
     catalog_name = get_config("catalog_name", required=True)
     db_name = get_config("db_name", required=True)
-    table_name = "csi_vert_ster_plan1"
+    table_name = "csi_forecasts_san"
     full_table_name = f"{catalog_name}.{db_name}.{table_name}"
 
-    sheet_name = "Vert Ster Plan"
-    data_range = "BK4:PK1000"
-    week_column = "DofWk"
-    city = "Sterling"
-    state = "Virginia"
-    return None, full_table_name, excel_path, sheet_name, data_range, week_column, city, state
+    sheet_name = "Forecasts"
+    data_range = "BK:DN"
+
+    # No reading here; main process handles it
+    return None, full_table_name, excel_path, sheet_name, data_range

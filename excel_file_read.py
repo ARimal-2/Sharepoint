@@ -100,7 +100,7 @@ def process_excel_file(
     file_name = sp_meta["name"]
     last_modified = sp_meta["lastModifiedDateTime"]
 
-    resource_name = file_name.replace(".xlsx", "").replace(" ", "_")
+    resource_name = file_name.replace(".xlsx", "")
 
     last_ingested = get_last_extracted_from_cos(resource_name)
 

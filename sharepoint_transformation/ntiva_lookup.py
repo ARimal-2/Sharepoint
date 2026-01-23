@@ -15,4 +15,4 @@ def ntiva_lookup_load(spark: SparkSession):
     data_range = "B2:F1000"
 
     # No reading here; main process handles it
-    return None, full_table_name, excel_path, sheet_name, data_range
+    return None, full_table_name, excel_path, sheet_name, data_range, None, None, None

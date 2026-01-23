@@ -8,11 +8,14 @@ def vert_san_plan_transform_and_load(spark: SparkSession):
 
     catalog_name = get_config("catalog_name", required=True)
     db_name = get_config("db_name", required=True)
-    table_name = "csi_vert_san_plan"
+    table_name = "csi_vert_san_plan2"
     full_table_name = f"{catalog_name}.{db_name}.{table_name}"
 
     sheet_name = "Vert San Plan"
-    data_range = "BK4:PN1000"
+    data_range = "BN4:PN1000"
+    week_column = "DoW"
+    city = "San Antonio"
+    state = "Texas"
 
     # No reading here; main process handles it
-    return None, full_table_name, excel_path, sheet_name, data_range
+    return None, full_table_name, excel_path, sheet_name, data_range, week_column, city, state  

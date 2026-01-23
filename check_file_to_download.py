@@ -10,6 +10,7 @@ def get_last_extracted_from_cos(resource_name: str):
     Returns None if metadata does not exist.
     """
     cos, bucket_name = connect_to_cos()
+    print(f"Reading metadata for resource: {resource_name} from COS bucket: {bucket_name}")
     metadata_key = f"Sharepoint/{resource_name}/{resource_name}_metadata.json"
 
     try:
