@@ -8,7 +8,7 @@ def vert_ster_plan_transform_and_load(spark: SparkSession):
 
     catalog_name = get_config("catalog_name", required=True)
     db_name = get_config("db_name", required=True)
-    table_name = "csi_vert_ster_plan1"
+    table_name = "Vert_STER_Plan_FY2026"
     full_table_name = f"{catalog_name}.{db_name}.{table_name}"
 
     sheet_name = "Vert Ster Plan"

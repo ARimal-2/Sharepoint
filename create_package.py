@@ -93,8 +93,8 @@ def prepare_package():
             "__init__.py", "vert_san_plan.py", "ntiva_lookup.py",
             "vert_alex_plan.py", "vert_ster_plan.py"
         ],
-        "sharepoint_transformation_2025": [
-            "__init__.py", "vert_ster_2025.py"
+        "Sharepoint_transformation_2025": [
+            "__init__.py", "vert_ster_2025.py","vert_san_plan_2025.py"
         ],
         "logs": ["__init__.py", "ingestion_logger.py"],
         "s3uploader": ["__init__.py", "connect.py", "upload_to_s3.py"]

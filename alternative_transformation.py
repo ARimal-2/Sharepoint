@@ -6,6 +6,8 @@ from sharepoint_transformation.vert_san_plan import vert_san_plan_transform_and_
 from sharepoint_transformation.vert_alex_plan import vert_alex_plan_transform_and_load
 from sharepoint_transformation.vert_ster_plan import vert_ster_plan_transform_and_load
 from sharepoint_transformation.ntiva_lookup import ntiva_lookup_load
+from Sharepoint_transformation_2025.vert_ster_2025 import vert_ster_25_plan_transform_and_load
+from Sharepoint_transformation_2025.vert_san_plan_2025 import vert_san_25_plan_transform_and_load
 
 # -----------------------------
 # Utility functions
@@ -41,7 +43,7 @@ def make_unique(names):
 
 def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column: str) -> DataFrame:
     """
-    Refactored distributed transformation (V4).
+    Refactored distributed transformation .
     Injects metadata as literals to minimize Spark plan complexity and prevent Driver OOM.
     """
     cols = df.columns
@@ -52,15 +54,21 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
     # This removes the metadata handling from the Spark logical plan entirely.
     period_row = df.filter(F.lower(F.trim(F.col(cols[0]))) == "period").first()
     date_row = df.filter(F.lower(F.trim(F.col(cols[0]))) == "date").first()
+    
+    # Fallback: if date_row not found, use week_column row
+    if date_row is None:
+        date_row = df.filter(F.lower(F.trim(F.col(cols[0]))) == week_column.lower()).first()
 
     if not period_row or not date_row:
-        raise ValueError("Missing 'Period' or 'Date' labels in column 0")
+        raise ValueError("Missing 'Period' label or 'Date'/'Week' labels in column 0")
 
     # 2. Build literal metadata lists
     p_lits = []
     d_lits = []
     for i in range(1, n_cols):
-        p_val = str(period_row[i]).strip().replace("-", "_") if period_row[i] is not None else "Unknown"
+        print (f"period_row[{i}]={period_row[i]}")
+        p_val = str(period_row[i]).strip() if period_row[i] is not None else "Unknown"
+        print(p_val)
         d_val = str(date_row[i]).strip() if date_row[i] is not None else None
         p_lits.append(F.lit(p_val))
         d_lits.append(F.lit(d_val))
@@ -83,7 +91,7 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
         # Excel Serial Date fallback
         F.when(
             F.col("zipped.d").cast("double").isNotNull(),
-            
+            F.date_add(F.to_date(F.lit("1899-12-30")), F.col("zipped.d").cast("int"))
         ),
         F.to_date(F.col("zipped.d"), "M/d/yyyy"),
         F.to_date(F.col("zipped.d"), "MM/dd/yyyy"),
@@ -99,11 +107,11 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
         F.when(
             F.col(cols[0]).cast("double").isNotNull(),
             F.regexp_replace(F.col(cols[0]).cast("string"), "\\.0$", "")
-        ).otherwise(F.trim(F.col(cols[0]))).alias("sku"),
+        ).otherwise(F.trim(F.col(cols[0]))).alias("Item"),
 
-        F.col("zipped.p").alias("period"),
+        F.col("zipped.p").alias("Period"),
 
-        F.when(F.year(raw_date) < 100, F.add_months(raw_date, 2000 * 12)).otherwise(raw_date).alias("date"),
+        F.when(F.year(raw_date) < 100, F.add_months(raw_date, 2000 * 12)).otherwise(raw_date).alias("Date"),
 
         # Value cleaning
         F.when(
@@ -111,12 +119,12 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
             None
         ).otherwise(
             F.regexp_replace(F.col("zipped.v").cast("string"), "[^0-9.\\-]", "").cast(DoubleType())
-        ).alias("value")
+        ).alias("Planning_Value")
     )
 
     # 6. Add Context
-    df_final = df_final.withColumn("city", F.lit(city)) \
-                       .withColumn("state", F.lit(state))
+    df_final = df_final.withColumn("City", F.lit(city)) \
+                       .withColumn("State", F.lit(state))
     
     return df_final
 
@@ -162,7 +170,14 @@ def process_table(spark: SparkSession, transform_func):
 # -----------------------------
 
 def transformation_main(spark: SparkSession):
+    #2026
     process_table(spark, vert_san_plan_transform_and_load)
-    # process_table(spark, vert_alex_plan_transform_and_load)
-    # process_table(spark, vert_ster_plan_transform_and_load)
-    # process_table(spark, ntiva_lookup_load)
+    process_table(spark, vert_alex_plan_transform_and_load)
+    process_table(spark, vert_ster_plan_transform_and_load)
+    
+    #lookup table
+    process_table(spark, ntiva_lookup_load)
+
+    # 2025
+    process_table(spark, vert_ster_25_plan_transform_and_load)
+    process_table(spark,vert_san_25_plan_transform_and_load)
