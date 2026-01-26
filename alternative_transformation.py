@@ -1,13 +1,18 @@
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType
-from sharepoint_transformation.vert_san_plan import vert_san_plan_transform_and_load
+from pyspark.sql import SparkSession, DataFrame, functions as F, Window
+from pyspark.sql.types import DoubleType, StringType, DateType
+import datetime
+import re
 from sharepoint_transformation.vert_san_plan import vert_san_plan_transform_and_load
 from sharepoint_transformation.vert_alex_plan import vert_alex_plan_transform_and_load
 from sharepoint_transformation.vert_ster_plan import vert_ster_plan_transform_and_load
 from sharepoint_transformation.ntiva_lookup import ntiva_lookup_load
 from Sharepoint_transformation_2025.vert_ster_2025 import vert_ster_25_plan_transform_and_load
 from Sharepoint_transformation_2025.vert_san_plan_2025 import vert_san_25_plan_transform_and_load
+from sharepoint_transformation.forecast_san import vert_fore_san_transform_and_load
+from sharepoint_transformation.forecast_ster import vert_fore_ster_transform_and_load
+from Sharepoint_transformation_2025.forecast_san import vert_fore_san_25_transform_and_load
+from Sharepoint_transformation_2025.forecast_ster import vert_fore_ster_25_transform_and_load
+from forecast_transformation import forecast_transform
 
 # -----------------------------
 # Utility functions
@@ -39,8 +44,6 @@ def make_unique(names):
 # Core transformation
 # -----------------------------
 
-
-
 def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column: str) -> DataFrame:
     """
     Refactored distributed transformation .
@@ -48,8 +51,6 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
     """
     cols = df.columns
     n_cols = len(cols)
-    
-    
 
     # This removes the metadata handling from the Spark logical plan entirely.
     period_row = df.filter(F.lower(F.trim(F.col(cols[0]))) == "period").first()
@@ -146,15 +147,32 @@ def process_table(spark: SparkSession, transform_func):
         .load(excel_path)
         .dropna(how="all")
     )
-    if transform_func != ntiva_lookup_load:
+    
+    forecast_funcs = (
+        vert_fore_san_transform_and_load, 
+        vert_fore_ster_transform_and_load,
+        vert_fore_san_25_transform_and_load,
+        vert_fore_ster_25_transform_and_load
+    )
+    
+    if transform_func in forecast_funcs:
+        df = forecast_transform(df)
+    elif transform_func != ntiva_lookup_load:
         df = transform_plan_transposed(df, city, state, week_column)
     else:
         df = df.withColumn(
             "item",
             F.col("item").cast("double").cast("long")
         )
+        
     # Write to Iceberg
-    if not spark.catalog.tableExists(full_table_name):
+    print(f"Sample of data for {full_table_name}:")
+    df.show(5, truncate=False)
+    
+    if transform_func in forecast_funcs:
+        print(f"Replacing Iceberg table {full_table_name} to match new schema")
+        df.writeTo(full_table_name).createOrReplace()
+    elif not spark.catalog.tableExists(full_table_name):
         print(f"Creating Iceberg table {full_table_name}")
         df.writeTo(full_table_name).create()
     else:
@@ -171,13 +189,21 @@ def process_table(spark: SparkSession, transform_func):
 
 def transformation_main(spark: SparkSession):
     #2026
-    process_table(spark, vert_san_plan_transform_and_load)
-    process_table(spark, vert_alex_plan_transform_and_load)
-    process_table(spark, vert_ster_plan_transform_and_load)
+    # process_table(spark, vert_san_plan_transform_and_load)
+    # process_table(spark, vert_alex_plan_transform_and_load)
+    # process_table(spark, vert_ster_plan_transform_and_load)
+
+    # #2026 forecast
+    # process_table(spark, vert_fore_san_transform_and_load)
+    # process_table(spark, vert_fore_ster_transform_and_load)
+    
+    #2025 forecast
+    process_table(spark, vert_fore_san_25_transform_and_load)
+    process_table(spark, vert_fore_ster_25_transform_and_load)
     
     #lookup table
-    process_table(spark, ntiva_lookup_load)
+    # process_table(spark, ntiva_lookup_load)
 
-    # 2025
-    process_table(spark, vert_ster_25_plan_transform_and_load)
-    process_table(spark,vert_san_25_plan_transform_and_load)
+    # # 2025
+    # process_table(spark, vert_ster_25_plan_transform_and_load)
+    # process_table(spark,vert_san_25_plan_transform_and_load)

@@ -88,13 +88,13 @@ def prepare_package():
     # Files to include: top-level and package files
     files_to_zip = {
         "": ["config.py", "alternative_transformation.py", "excel_file_read.py", 
-             "check_file_to_download.py", "metadata.py"],  # top-level files
+             "check_file_to_download.py", "metadata.py","forecast_transformation.py"],  # top-level files
         "sharepoint_transformation": [
             "__init__.py", "vert_san_plan.py", "ntiva_lookup.py",
-            "vert_alex_plan.py", "vert_ster_plan.py"
+            "vert_alex_plan.py", "vert_ster_plan.py","forecast_san.py","forecast_ster.py"
         ],
         "Sharepoint_transformation_2025": [
-            "__init__.py", "vert_ster_2025.py","vert_san_plan_2025.py"
+            "__init__.py", "vert_ster_2025.py","vert_san_plan_2025.py","forecast_san.py","forecast_ster.py"
         ],
         "logs": ["__init__.py", "ingestion_logger.py"],
         "s3uploader": ["__init__.py", "connect.py", "upload_to_s3.py"]
