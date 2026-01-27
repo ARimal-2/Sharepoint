@@ -12,7 +12,7 @@ def vert_ster_plan_transform_and_load(spark: SparkSession):
     full_table_name = f"{catalog_name}.{db_name}.{table_name}"
 
     sheet_name = "Vert Ster Plan"
-    data_range = "BK4:PK1000"
+    data_range = "BK4:PK100"
     week_column = "DofWk"
     city = "Sterling"
     state = "Virginia"

@@ -123,9 +123,14 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
         ).alias("Planning_Value")
     )
 
-    # 6. Add Context
+    # 6. Add Context and Filter
     df_final = df_final.withColumn("City", F.lit(city)) \
-                       .withColumn("State", F.lit(state))
+                       .withColumn("State", F.lit(state)) \
+                       .filter(
+                           (F.col("Item").cast("string") != "0") & 
+                           (F.col("Item").cast("string") != "0.0") & 
+                           (F.col("Item").isNotNull())
+                       )
     
     return df_final
 
@@ -188,22 +193,22 @@ def process_table(spark: SparkSession, transform_func):
 # -----------------------------
 
 def transformation_main(spark: SparkSession):
-    #2026
-    # process_table(spark, vert_san_plan_transform_and_load)
-    # process_table(spark, vert_alex_plan_transform_and_load)
-    # process_table(spark, vert_ster_plan_transform_and_load)
+    # 2026
+    process_table(spark, vert_san_plan_transform_and_load)
+    process_table(spark, vert_alex_plan_transform_and_load)
+    process_table(spark, vert_ster_plan_transform_and_load)
 
     # #2026 forecast
     # process_table(spark, vert_fore_san_transform_and_load)
     # process_table(spark, vert_fore_ster_transform_and_load)
     
-    #2025 forecast
-    process_table(spark, vert_fore_san_25_transform_and_load)
-    process_table(spark, vert_fore_ster_25_transform_and_load)
+    # #2025 forecast
+    # process_table(spark, vert_fore_san_25_transform_and_load)
+    # process_table(spark, vert_fore_ster_25_transform_and_load)
     
     #lookup table
     # process_table(spark, ntiva_lookup_load)
 
     # # 2025
-    # process_table(spark, vert_ster_25_plan_transform_and_load)
-    # process_table(spark,vert_san_25_plan_transform_and_load)
+    process_table(spark, vert_ster_25_plan_transform_and_load)
+    process_table(spark,vert_san_25_plan_transform_and_load)

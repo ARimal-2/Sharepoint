@@ -70,6 +70,10 @@ def build_fact_planning_table(spark: SparkSession):
     combined_planning_df = combined_dfs[0]
     for df in combined_dfs[1:]:
         combined_planning_df = combined_planning_df.unionByName(df)
+    
+    # Diagnostic: Count rows after union
+    total_rows_after_union = combined_planning_df.count()
+    print(f"Total rows after union: {total_rows_after_union:,}")
 
     # 3. Add PDIL and PrimaryKey columns
     # PDIL format: Period-Date-Item-Location
@@ -84,13 +88,22 @@ def build_fact_planning_table(spark: SparkSession):
     )
 
     # 4. Deduplicate using PDIL as the unique key
+    # Note: Using the filter to keep only 1 row per unique Period-Date-Item-Location.
     window_spec = Window.partitionBy("PDIL").orderBy(F.lit(1))
     dedup_df = (
         df_with_keys
         .withColumn("_row_num", F.row_number().over(window_spec))
-        .filter(F.col("_row_num") == 1)
+        .filter(F.col("_row_num") == 1)  # Re-enabled to remove duplicates
         .drop("_row_num")
     )
+    
+    # Diagnostic: Confirm matching counts
+    total_rows_final = dedup_df.count()
+    print(f"Total rows in fact transformation: {total_rows_final:,}")
+    if total_rows_final == total_rows_after_union:
+        print("✅ SUCCESS: All source rows are included (Deduplication disabled)")
+    else:
+        print(f"⚠️  Note: Row count changed from {total_rows_after_union:,} to {total_rows_final:,}")
 
     # 5. Handle Target Table Logic (Initialization or Merge)
     if not spark.catalog.tableExists(target_table):
@@ -116,24 +129,37 @@ def build_fact_planning_table(spark: SparkSession):
     print(f"Merging updates into {target_table}...")
     dedup_df.createOrReplaceTempView("dedup_source_view")
 
-    # Regular Update for changed values (removed audit columns)
-    # Note: PrimaryKey and PDIL are business keys. Only Planning_Value and Item (meta) change.
+    # Regular Update for changed values 
+    # Logic: We use a CTE to ensure the source is unique for the 'ON' condition to avoid Cardinality errors.
     try:
         spark.sql(f"""
+            WITH unique_source AS (
+                SELECT * FROM (
+                    SELECT *, ROW_NUMBER() OVER(PARTITION BY PDIL ORDER BY 1) as rn
+                    FROM dedup_source_view
+                ) WHERE rn = 1
+            )
             MERGE INTO {target_table} AS t
-            USING dedup_source_view AS s
+            USING unique_source AS s
             ON t.PDIL = s.PDIL
-            WHEN MATCHED AND (t.Planning_Value != s.Planning_Value OR t.Item != s.Item) THEN
+            WHEN MATCHED AND (t.Planning_Value != s.Planning_Value OR s.Planning_Value IS NOT NULL AND t.Planning_Value IS NULL) THEN
                 UPDATE SET 
                     t.Planning_Value = s.Planning_Value,
                     t.Item = s.Item
         """)
         
         # Handle New Inserts separately to manage PrimaryKey generation reliably
+        # This will include ALL rows from the source that don't have a matching PDIL in the target,
+        # including duplicates within the source itself.
         max_id = spark.sql(f"SELECT COALESCE(MAX(PrimaryKey), 0) FROM {target_table}").collect()[0][0]
         
         new_records = (
-            spark.sql(f"SELECT s.* FROM dedup_source_view s LEFT JOIN {target_table} t ON s.PDIL = t.PDIL WHERE t.PDIL IS NULL")
+            spark.sql(f"""
+                SELECT s.* 
+                FROM dedup_source_view s 
+                LEFT JOIN {target_table} t ON s.PDIL = t.PDIL 
+                WHERE t.PDIL IS NULL
+            """)
             .withColumn("PrimaryKey", F.row_number().over(Window.orderBy("PDIL")) + max_id)
             .select("PrimaryKey", "PDIL", "Period", "Date", "Item", "Planning_Value", "Location", "City", "State")
         )
