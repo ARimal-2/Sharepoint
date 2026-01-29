@@ -135,7 +135,13 @@ def transform_plan_transposed(df: DataFrame, city: str, state: str, week_column:
     return df_final
 
 def process_table(spark: SparkSession, transform_func):
-    _, full_table_name, excel_path, sheet_name, data_range, week_column, city, state = transform_func(spark)
+    config_result = transform_func(spark)
+    # Correctly unpack based on the number of values returned
+    if len(config_result) == 9:
+        _, full_table_name, excel_path, sheet_name, data_range, week_column, city, state, pdwks_range = config_result
+    else:
+        _, full_table_name, excel_path, sheet_name, data_range, week_column, city, state = config_result
+        pdwks_range = None
 
     print(f"Reading {sheet_name} from {excel_path} (range {data_range})")
     header_option = "true" if transform_func is ntiva_lookup_load else "false"
@@ -161,7 +167,7 @@ def process_table(spark: SparkSession, transform_func):
     )
     
     if transform_func in forecast_funcs:
-        df = forecast_transform(df)
+        df = forecast_transform(spark, df, city, excel_path, pdwks_range)
     elif transform_func != ntiva_lookup_load:
         df = transform_plan_transposed(df, city, state, week_column)
     else:
@@ -194,21 +200,21 @@ def process_table(spark: SparkSession, transform_func):
 
 def transformation_main(spark: SparkSession):
     # 2026
-    process_table(spark, vert_san_plan_transform_and_load)
-    process_table(spark, vert_alex_plan_transform_and_load)
-    process_table(spark, vert_ster_plan_transform_and_load)
+    # process_table(spark, vert_san_plan_transform_and_load)
+    # process_table(spark, vert_alex_plan_transform_and_load)
+    # process_table(spark, vert_ster_plan_transform_and_load)
 
     # #2026 forecast
-    # process_table(spark, vert_fore_san_transform_and_load)
-    # process_table(spark, vert_fore_ster_transform_and_load)
+    process_table(spark, vert_fore_san_transform_and_load)
+    process_table(spark, vert_fore_ster_transform_and_load)
     
     # #2025 forecast
-    # process_table(spark, vert_fore_san_25_transform_and_load)
-    # process_table(spark, vert_fore_ster_25_transform_and_load)
+    process_table(spark, vert_fore_san_25_transform_and_load)
+    process_table(spark, vert_fore_ster_25_transform_and_load)
     
     #lookup table
     # process_table(spark, ntiva_lookup_load)
 
-    # # 2025
-    process_table(spark, vert_ster_25_plan_transform_and_load)
-    process_table(spark,vert_san_25_plan_transform_and_load)
+    # # # 2025
+    # process_table(spark, vert_ster_25_plan_transform_and_load)
+    # process_table(spark,vert_san_25_plan_transform_and_load)

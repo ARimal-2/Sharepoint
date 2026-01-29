@@ -8,14 +8,15 @@ def vert_fore_san_25_transform_and_load(spark: SparkSession):
 
     catalog_name = get_config("catalog_name", required=True)
     db_name = get_config("db_name", required=True)
-    table_name = "san_forecasts_25"
+    table_name = "Forecast_SAN_FY2025"
     full_table_name = f"{catalog_name}.{db_name}.{table_name}"
 
     sheet_name = "Forecasts"
     data_range = "DJ1:EI1000"
     week_column = None
-    city = None
-    state = None
+    city = "San Antonio"
+    state = "Texas"
+    pdwks_range = "A2193:B2556"
 
     # No reading here; main process handles it
-    return None, full_table_name, excel_path, sheet_name, data_range, week_column, city, state
+    return None, full_table_name, excel_path, sheet_name, data_range, week_column, city, state, pdwks_range

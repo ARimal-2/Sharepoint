@@ -101,9 +101,9 @@ def build_fact_planning_table(spark: SparkSession):
     total_rows_final = dedup_df.count()
     print(f"Total rows in fact transformation: {total_rows_final:,}")
     if total_rows_final == total_rows_after_union:
-        print("✅ SUCCESS: All source rows are included (Deduplication disabled)")
+        print("SUCCESS: All source rows are included (Deduplication disabled)")
     else:
-        print(f"⚠️  Note: Row count changed from {total_rows_after_union:,} to {total_rows_final:,}")
+        print(f"Note: Row count changed from {total_rows_after_union:,} to {total_rows_final:,}")
 
     # 5. Handle Target Table Logic (Initialization or Merge)
     if not spark.catalog.tableExists(target_table):

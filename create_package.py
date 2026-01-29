@@ -88,7 +88,8 @@ def prepare_package():
     # Files to include: top-level and package files
     files_to_zip = {
         "": ["config.py", "alternative_transformation.py", "excel_file_read.py", 
-             "check_file_to_download.py", "metadata.py","forecast_transformation.py"],  # top-level files
+             "check_file_to_download.py", "metadata.py", "forecast_transformation.py", 
+             "fact_planning_transformation.py","fact_forecast_transformation.py"],  # top-level files
         "sharepoint_transformation": [
             "__init__.py", "vert_san_plan.py", "ntiva_lookup.py",
             "vert_alex_plan.py", "vert_ster_plan.py","forecast_san.py","forecast_ster.py"

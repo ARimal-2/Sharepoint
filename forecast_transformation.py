@@ -1,17 +1,14 @@
-
-from pyspark.sql import DataFrame
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+from pyspark.sql import SparkSession, DataFrame, functions as F, Window
 import datetime
+import re
 
-from pyspark.sql import DataFrame, functions as F, Window
-import datetime
-
-def forecast_transform(df: DataFrame) -> DataFrame:
+def forecast_transform(spark: SparkSession, df: DataFrame, city: str, excel_path: str, pdwks_range: str = "A2557:B2920") -> DataFrame:
     """
     Output Schema:
     Period | Date | SKU | Item | Forecast_Value
     """
+    if pdwks_range is None:
+        pdwks_range = "A2557:B2920"
 
     cols = df.columns
     if not cols:
@@ -19,13 +16,8 @@ def forecast_transform(df: DataFrame) -> DataFrame:
 
     period_col = cols[0]
 
-    # ---------------------------------------------------------
     # 1. Locate SKU header row
-    # ---------------------------------------------------------
     preview_rows = df.limit(25).collect()
-    if not preview_rows:
-        return df
-
     sku_row_idx = -1
     for idx, row in enumerate(preview_rows):
         first_val = str(row[0]).strip().lower() if row[0] else ""
@@ -39,9 +31,7 @@ def forecast_transform(df: DataFrame) -> DataFrame:
     sku_row = preview_rows[sku_row_idx]
     item_row = preview_rows[sku_row_idx - 1]
 
-    # ---------------------------------------------------------
     # 2. Detect first forecast period row dynamically
-    # ---------------------------------------------------------
     data_start_idx = None
     for idx in range(sku_row_idx + 1, len(preview_rows)):
         val = str(preview_rows[idx][0]).strip()
@@ -52,51 +42,28 @@ def forecast_transform(df: DataFrame) -> DataFrame:
     if data_start_idx is None:
         raise ValueError("Could not detect forecast period rows.")
 
-    # ---------------------------------------------------------
-    # 3. Build column mappings (include ALL item/SKU fields)
-    # ---------------------------------------------------------
+    # 3. Build column mappings
     item_lits, sku_lits, val_cols = [], [], []
-
     for i in range(1, len(cols)):
-        item_val = item_row[i]
-        sku_val = sku_row[i]
-
-        if (item_val is None or str(item_val).strip() == "") and \
-           (sku_val is None or str(sku_val).strip() == ""):
+        item_val, sku_val = item_row[i], sku_row[i]
+        if (item_val is None or str(item_val).strip() == "") and (sku_val is None or str(sku_val).strip() == ""):
             continue
-
         item_str = str(item_val).strip() if item_val not in (None, "") else None
         sku_str = str(sku_val).strip() if sku_val not in (None, "") else None
-
         item_lits.append(F.lit(item_str))
         sku_lits.append(F.lit(sku_str))
         val_cols.append(F.col(cols[i]))
 
-    # ---------------------------------------------------------
-    # 4. Add proper sequential row index
-    # ---------------------------------------------------------
+    # 4. Filter data
     w = Window.orderBy(F.monotonically_increasing_id())
-    df_with_id = df.withColumn("_row_id", F.row_number().over(w) - 1)
+    data_df = df.withColumn("_row_id", F.row_number().over(w) - 1).filter(F.col("_row_id") >= data_start_idx)
 
-    data_df = (
-        df_with_id
-        .filter(F.col("_row_id") >= data_start_idx)
-        .drop("_row_id")
-    )
-
-    # ---------------------------------------------------------
-    # 5. Melt wide → long
-    # ---------------------------------------------------------
-    df_long = data_df.withColumn(
-        "zipped",
-        F.explode(
-            F.arrays_zip(
-                F.array(*item_lits).alias("item"),
-                F.array(*sku_lits).alias("sku"),
-                F.array(*val_cols).alias("qty")
-            )
-        )
-    )
+    # 5. Melt wide -> long
+    df_long = data_df.withColumn("zipped", F.explode(F.arrays_zip(
+        F.array(*item_lits).alias("item"),
+        F.array(*sku_lits).alias("sku"),
+        F.array(*val_cols).alias("qty")
+    )))
 
     res = (
         df_long.select(
@@ -105,68 +72,64 @@ def forecast_transform(df: DataFrame) -> DataFrame:
             F.col("zipped.item").alias("Item_raw"),
             F.col("zipped.qty").alias("Forecast_raw")
         )
-        .filter(
-            F.col("Period").isNotNull() & 
-            (F.col("Period") != "") &
-            ~F.lower(F.col("Period")).contains("pallet") &
-            ~F.lower(F.col("Period")).contains("weight") &
-            ~F.lower(F.col("Period")).contains("cases") &
-            ~F.col("Period").rlike("^[0-9.]+$")
-        )
+        .filter(F.col("Period").isNotNull() & (F.col("Period") != "") & 
+                ~F.lower(F.col("Period")).rlike("pallet|weight|cases") & ~F.col("Period").rlike("^[0-9.]+$"))
     )
 
-    # ---------------------------------------------------------
-    # 6. Type handling: Keep Item as in Excel, clean SKU, round Forecast
-    # ---------------------------------------------------------
-    res = res.withColumn(
-        "Item",
-        F.col("Item_raw").cast("double"),  # keep exactly as in Excel (nulls stay null)
-    ).withColumn(
-        "SKU",  
-        F.when(F.col("SKU_raw").rlike("^[0-9]+(?:\\.0)?$"),
-               F.col("SKU_raw").cast("int"))  # remove .0 if numeric
-         .otherwise(F.col("SKU_raw"))  # keep alphanumeric intact
-    ).withColumn(
-        "Forecast_Value",
-        F.round(
-            F.regexp_replace(F.col("Forecast_raw"), "[^0-9.]", "").cast("double"), 
-            0
-        )
-    ).withColumn(
-        "Forecast_Value",
-        F.coalesce(F.col("Forecast_Value"), F.lit(0.0))
+    # 6. Type handling
+    # 6. Type handling
+    # Changed Item to String to support alphanumeric combinations (e.g. 600 + Varchar SKU)
+    res = res.withColumn("Item", F.when(F.col("Item_raw").rlike("^[0-9]+(?:\\.0)?$"), 
+                                      F.regexp_replace(F.col("Item_raw"), "\\.0$", ""))
+                               .otherwise(F.col("Item_raw"))) \
+             .withColumn("SKU", F.when(F.col("SKU_raw").rlike("^[0-9]+(?:\\.0)?$"), F.regexp_replace(F.col("SKU_raw"), "\\.0$", "")).otherwise(F.col("SKU_raw"))) \
+             .withColumn("Forecast_Value", F.round(F.regexp_replace(F.col("Forecast_raw"), "[^0-9.]", "").cast("double"), 0)) \
+             .withColumn("Forecast_Value", F.coalesce(F.col("Forecast_Value"), F.lit(0.0)))
+
+    if city in ["SAN", "San Antonio"]:
+        # Removed .cast("double") to allow alphanumeric Item codes
+        res = res.withColumn("Item", F.when(F.col("Item").isNull() | (F.trim(F.col("Item")) == ""), F.concat(F.lit("600"), F.col("SKU"))).otherwise(F.col("Item")))
+    elif city in ["STER", "Sterling"]:
+        # Removed .cast("double") to allow alphanumeric Item codes
+        res = res.withColumn("Item", F.when(F.col("Item").isNull() | (F.trim(F.col("Item")) == ""), F.concat(F.lit("200"), F.col("SKU"))).otherwise(F.col("Item")))
+
+    # 7. Read Period-to-Date mapping from PdWks (Range A2557:B2920)
+    print(f"Reading PdWks mapping from {excel_path}...") 
+    pdwks_df = (
+        spark.read.format("com.crealytics.spark.excel")
+        .option("dataAddress", f"'PdWks'!{pdwks_range}")
+        .option("header", "false")
+        .option("useStreamingReader", "true")
+        .option("maxRowsInMemory", "50")
+        .load(excel_path)
     )
-
-    # ---------------------------------------------------------
-    # 7. Period → Date mapping
-    # ---------------------------------------------------------
-    ordered_periods = (
-        res.select("Period")
-           .distinct()
-           .rdd.map(lambda r: r[0])
-           .collect()
-    )
-
-    start_date = datetime.date(2025, 6, 30)
-    mapping_data = [
-        (p, start_date + datetime.timedelta(days=7 * i))
-        for i, p in enumerate(ordered_periods)
-    ]
-
-    spark = df.sparkSession
-    mapping_df = spark.createDataFrame(mapping_data, ["Period", "Date"])
-
-
-    output_cols = ["Period", "Date", "SKU", "Item", "Forecast_Value"]
     
-
-    item_is_null = res.filter(F.col("Item").isNotNull()).count() == 0
-    if item_is_null:
-        output_cols.remove("Item")
+    # Define columns: A=Date, B=Period. Filter for Mondays (Day 2 in Spark, Sunday=1)
+    # Using dayofweek(date) where 1=Sunday, 2=Monday...
+    mapping_df = (
+        pdwks_df.select(
+            F.col("_c0").alias("raw_date"),
+            F.trim(F.col("_c1")).alias("Period")
+        )
+        .withColumn("raw_date_parsed", F.coalesce(
+            F.to_date(F.col("raw_date"), "M/d/yyyy"),
+            F.to_date(F.col("raw_date"), "M/d/yy"),
+            F.when(F.col("raw_date").cast("double").isNotNull(), 
+                   F.date_add(F.to_date(F.lit("1899-12-30")), F.col("raw_date").cast("int")))
+        ))
+        .withColumn("Date", 
+            F.when(F.year(F.col("raw_date_parsed")) < 100, 
+                   F.add_months(F.col("raw_date_parsed"), 2000 * 12))
+             .otherwise(F.col("raw_date_parsed"))
+        )
+        .filter(F.dayofweek(F.col("Date")) == 2) # Keep only Mondays
+        .select("Period", "Date")
+        .distinct()
+    )
 
     final_df = (
         res.join(mapping_df, on="Period", how="left")
-           .select(*output_cols)
+           .select("Period", "Date", "SKU", "Item", "Forecast_Value")
     )
 
     return final_df

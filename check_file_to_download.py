@@ -42,6 +42,30 @@ def get_last_extracted_from_cos(resource_name: str):
 #     return metadata.get("last_extracted")
 
 
+def parse_dt(dt_str: str) -> datetime:
+    """Helper to parse various date formats."""
+    # Remove Z and replace with +00:00 for fromisoformat
+    clean_str = dt_str.replace("Z", "+00:00")
+    
+    try:
+        # Try standard ISO format first (e.g. 2026-01-27T19:20:04 or 2026-01-27T19:20:04+00:00)
+        return datetime.fromisoformat(clean_str)
+    except ValueError:
+        # Try basic format without separators (e.g. 20260127T192004)
+        try:
+            return datetime.strptime(clean_str, "%Y%m%dT%H%M%S")
+        except ValueError:
+            # Fallback for other possible formats if needed
+            print(f"Warning: Could not parse date string '{dt_str}'. Attempting custom repair.")
+            # Basic repair for YYYYMMDD to YYYY-MM-DD
+            if len(dt_str) >= 8 and dt_str[4] != '-' and dt_str[7] != '-':
+                 try:
+                     # Attempt to parse YYYYMMDD...
+                     return datetime.strptime(dt_str[:8], "%Y%m%d")
+                 except:
+                     pass
+            raise
+
 def should_download(sp_last_modified: str, last_extracted: str | None) -> bool:
     """
     Returns True if SharePoint file was modified after last extraction.
@@ -49,14 +73,19 @@ def should_download(sp_last_modified: str, last_extracted: str | None) -> bool:
     if last_extracted is None:
         return True  # First run: always download
 
-    sp_dt = datetime.fromisoformat(sp_last_modified.replace("Z", "+00:00")).astimezone(timezone.utc)
-    last_dt = datetime.fromisoformat(last_extracted)
-    if last_dt.tzinfo is None:
-        last_dt = last_dt.replace(tzinfo=timezone.utc)
-    else:
-        last_dt = last_dt.astimezone(timezone.utc)
+    try:
+        sp_dt = parse_dt(sp_last_modified).astimezone(timezone.utc)
+        last_dt = parse_dt(last_extracted)
+        
+        if last_dt.tzinfo is None:
+            last_dt = last_dt.replace(tzinfo=timezone.utc)
+        else:
+            last_dt = last_dt.astimezone(timezone.utc)
 
-    return last_dt < sp_dt
+        return last_dt < sp_dt
+    except Exception as e:
+        print(f"Error comparing dates: {e}. Defaulting to download.")
+        return True
 
 # # -----------------------------
 # # Download decision logic

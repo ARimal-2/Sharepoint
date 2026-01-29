@@ -2,7 +2,7 @@ from pyspark.sql import SparkSession
 from alternative_transformation import transformation_main
 from excel_file_read import excel_main
 from fact_planning_transformation import build_fact_planning_table
-from validate_fact_planning import validate_fact_planning_ingestion
+from fact_forecast_transformation import build_fact_forecast_table
 
 if __name__ == "__main__":
     spark = (
@@ -21,16 +21,13 @@ if __name__ == "__main__":
         # 2. Run individual table transformations
         transformation_main(spark)
         
-        # 3. Build the combined fact planning table
+        # 3. Build the combined fact tables
         print("Starting Fact Planning Table Build...")
         build_fact_planning_table(spark)
-        
-        # 4. Validate the final ingestion
-        print("\n" + "="*80)
-        print("Running validation checks...")
-        print("="*80 + "\n")
-        validate_fact_planning_ingestion(spark)
-        
+
+        print("Starting Fact Forecast Table Build...")
+        build_fact_forecast_table(spark)
+    
         print("Processing sequence completed successfully.")
     else:
         print("No changes detected. Skipping transformation and fact table build.")
