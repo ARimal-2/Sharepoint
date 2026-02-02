@@ -30,11 +30,11 @@ GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 def get_access_token():
     url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
     payload = {
-        "grant_type": "password",
+        "grant_type": "client_credentials",
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
-        "username": USERNAME,
-        "password": PASSWORD,
+        # "username": USERNAME,
+        # "password": PASSWORD,
         "scope": GRAPH_SCOPE,
     }
 
